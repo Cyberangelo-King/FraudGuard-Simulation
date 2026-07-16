@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
@@ -17,6 +18,8 @@ class TransactionCreate(BaseModel):
 
 class TransactionRead(TransactionCreate):
     id: uuid.UUID
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     class Config:
         from_attributes = True

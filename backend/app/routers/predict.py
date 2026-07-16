@@ -1,8 +1,17 @@
 """
 POST /api/predict
-==================
+=================
 Receives raw transaction features, runs the full ensemble + SHAP + Gemini
 pipeline, and writes the result to the Supabase `transactions` table.
+
+Simulation note: The `status` field returned by inference ('flagged' | 'pending')
+maps directly to the owner-confirmation flow:
+  - 'pending'  → transaction is low-risk, processes normally
+  - 'flagged'  → transaction is paused; owner must confirm via primary device
+                 (implemented in frontend DeviceOwner.jsx notification flow)
+
+The Supabase Realtime channel broadcasts INSERT events to all connected
+device routes so all four tabs react simultaneously.
 """
 
 from __future__ import annotations
@@ -34,7 +43,7 @@ class PredictRequest(BaseModel):
     are engineered features added during preprocessing.
     """
 
-    device_id: str = Field(..., description="Originating device identifier")
+    device_id: str   = Field(..., description="Originating device identifier")
     amount:    float = Field(..., gt=0, description="Raw transaction amount in USD")
 
     # PCA components
@@ -82,8 +91,13 @@ async def predict(
     1. Extract features from the request body.
     2. Run ensemble inference (LR + RF + XGB → meta-learner).
     3. If score > threshold: compute SHAP values (thread pool) and call Gemini.
-    4. Persist the transaction to Supabase.
+    4. Persist the transaction to Supabase (triggers Realtime broadcast to all devices).
     5. Return the full prediction result.
+
+    Realtime note: The Supabase INSERT in step 4 broadcasts to the
+    `supabase_realtime` publication, which all four frontend device routes
+    (owner, fraudster, secondary, dashboard) subscribe to. Flagged transactions
+    trigger the owner-confirmation notification flow on /device/owner.
     """
 
     # ── 1. Inference ──────────────────────────────────────────────────────────

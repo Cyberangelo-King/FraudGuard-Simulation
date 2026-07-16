@@ -1,25 +1,25 @@
--- ==============================================================
+-- ============================================================================
 -- FraudGuard DSS — Supabase Schema
 -- Run this in the Supabase SQL Editor
--- ==============================================================
+-- ============================================================================
 
--- ── Enable required extensions ─────────────────────────────────
+-- ── Enable required extensions ───────────────────────────────────────────────
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- ── Transactions table ──────────────────────────────────────────
+-- ── Transactions table ───────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.transactions (
-    id                  UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-    device_id           TEXT        NOT NULL,
-    amount              DECIMAL(14, 2) NOT NULL CHECK (amount > 0),
-    ensemble_score      DECIMAL(5, 4)  CHECK (ensemble_score >= 0 AND ensemble_score <= 1),
+    id                  UUID            PRIMARY KEY DEFAULT uuid_generate_v4(),
+    device_id           TEXT            NOT NULL,
+    amount              DECIMAL(14, 2)  NOT NULL CHECK (amount > 0),
+    ensemble_score      DECIMAL(5, 4)   CHECK (ensemble_score >= 0 AND ensemble_score <= 1),
     gemini_explanation  TEXT,
-    status              TEXT        NOT NULL DEFAULT 'pending'
-                                    CHECK (status IN ('pending', 'approved', 'flagged')),
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    status              TEXT            NOT NULL DEFAULT 'pending'
+                                        CHECK (status IN ('pending', 'approved', 'flagged')),
+    created_at          TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ     NOT NULL DEFAULT NOW()
 );
 
--- ── Auto-update `updated_at` on every row change ────────────────
+-- ── Auto-update `updated_at` on every row change ─────────────────────────────
 CREATE OR REPLACE FUNCTION public.set_updated_at()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
@@ -32,12 +32,12 @@ CREATE OR REPLACE TRIGGER trg_transactions_updated_at
     BEFORE UPDATE ON public.transactions
     FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
--- ── Indexes ─────────────────────────────────────────────────────
+-- ── Indexes ──────────────────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_transactions_status     ON public.transactions (status);
 CREATE INDEX IF NOT EXISTS idx_transactions_device_id  ON public.transactions (device_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON public.transactions (created_at DESC);
 
--- ── Row Level Security ──────────────────────────────────────────
+-- ── Row Level Security ───────────────────────────────────────────────────────
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 
 -- Allow anon/service-role reads (adjust as needed for your auth model)
@@ -51,16 +51,19 @@ CREATE POLICY "Allow service role insert" ON public.transactions
 CREATE POLICY "Allow service role update" ON public.transactions
     FOR UPDATE USING (true);
 
--- ── Realtime Replication ────────────────────────────────────────
+-- ── Realtime Replication ──────────────────────────────────────────────────────
 -- Add the transactions table to the supabase_realtime publication
 -- so that all INSERT / UPDATE / DELETE events are broadcast.
 ALTER PUBLICATION supabase_realtime ADD TABLE public.transactions;
 
--- Optionally narrow the replication to specific columns to reduce
--- payload size (comment out if you want the full row):
--- ALTER TABLE public.transactions REPLICA IDENTITY FULL;
+-- IMPORTANT: Enable REPLICA IDENTITY FULL so that DELETE events include the
+-- full row data (including `id`) in payload.old. Without this, the frontend's
+-- DELETE handler cannot identify which row to remove from local state.
+--
+-- This is required for the useTransactions hook's DELETE branch to work correctly.
+ALTER TABLE public.transactions REPLICA IDENTITY FULL;
 
--- ── Seed: sample rows for local development ─────────────────────
+-- ── Seed: sample rows for local development ───────────────────────────────────
 INSERT INTO public.transactions (device_id, amount, ensemble_score, gemini_explanation, status) VALUES
   ('DEV-001', 149.99, 0.0821, 'Low-risk purchase: amount within typical range for this device profile.', 'approved'),
   ('DEV-002', 4999.00, 0.9342, 'High-risk: unusually large amount, first transaction from this device, geolocation anomaly detected.', 'flagged'),

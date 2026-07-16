@@ -16,7 +16,32 @@ function ScoreBar({ score }) {
   )
 }
 
-export default function Dashboard() {
+// Simple error boundary for the dashboard
+class DashboardErrorBoundary extends window.React?.Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '2rem', color: '#ff4d6d' }}>
+          <h2>Dashboard Error</h2>
+          <p>{this.state.error?.message ?? 'An unexpected error occurred.'}</p>
+          <button onClick={() => this.setState({ hasError: false, error: null })}>
+            Retry
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+function DashboardContent() {
   const { transactions, loading, error } = useTransactions(100)
 
   const flagged  = transactions.filter((t) => t.status === 'flagged').length
@@ -33,10 +58,10 @@ export default function Dashboard() {
           <span className="logo-text">FraudGuard</span>
         </div>
         <nav className="sidebar-nav">
-          <a href="#" className="nav-item active">Dashboard</a>
-          <a href="#" className="nav-item">Transactions</a>
-          <a href="#" className="nav-item">Analytics</a>
-          <a href="#" className="nav-item">Settings</a>
+          <a href="/dashboard" className="nav-item active">Dashboard</a>
+          <a href="/device/owner" className="nav-item" target="_blank" rel="noreferrer">Owner Device</a>
+          <a href="/device/fraudster" className="nav-item" target="_blank" rel="noreferrer">Fraudster Device</a>
+          <a href="/device/secondary" className="nav-item" target="_blank" rel="noreferrer">Secondary Device</a>
         </nav>
         <div className="sidebar-footer">
           <span className="live-dot" />
@@ -114,5 +139,13 @@ export default function Dashboard() {
         </section>
       </main>
     </div>
+  )
+}
+
+export default function Dashboard() {
+  return (
+    <DashboardErrorBoundary>
+      <DashboardContent />
+    </DashboardErrorBoundary>
   )
 }

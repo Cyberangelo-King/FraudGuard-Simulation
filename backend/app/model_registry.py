@@ -26,7 +26,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# ── Resolve the models directory ──────────────────────────────────────────────
+# ── Resolve the models directory ─────────────────────────────────────────────
 # backend/app/model_registry.py  →  ../../models/
 _MODELS_DIR = Path(__file__).resolve().parent.parent.parent / "models"
 
@@ -34,16 +34,28 @@ _MODELS_DIR = Path(__file__).resolve().parent.parent.parent / "models"
 def _load(filename: str) -> Any:
     path = _MODELS_DIR / filename
     if not path.exists():
-        raise FileNotFoundError(f"Model artefact not found: {path}")
-    
-    # NEW: Check if the file is a dummy LFS pointer before trying to unpickle
-    file_size_bytes = path.stat().st_size
-    if file_size_bytes < 500: # LFS pointers are usually < 150 bytes
-        raise RuntimeError(
-            f"ERROR: {filename} is only {file_size_bytes} bytes. "
-            "It is an LFS pointer, not a binary file! "
-            "Render failed to pull LFS data."
+        raise FileNotFoundError(
+            f"Model artefact not found: {path}\n"
+            f"Ensure all *.pkl files are committed to git WITHOUT Git LFS. "
+            f"Remove LFS tracking by editing .gitattributes if needed."
         )
+
+    # Check if the file is a Git LFS pointer (pointer files are tiny text files)
+    file_size_bytes = path.stat().st_size
+    if file_size_bytes < 500:  # LFS pointers are usually < 150 bytes
+        # Double-check by reading the first few bytes
+        with path.open("rb") as fh:
+            header = fh.read(12)
+        if header.startswith(b"version http"):
+            raise RuntimeError(
+                f"ERROR: {filename} is a Git LFS pointer ({file_size_bytes} bytes), "
+                f"not a real binary file.\n"
+                f"Render does not pull LFS objects by default. Fix options:\n"
+                f"  1. Remove LFS tracking from .gitattributes and re-commit the "
+                f"     actual binary files.\n"
+                f"  2. Or configure Render to pull LFS (requires git-lfs support).\n"
+                f"See .gitattributes and README for details."
+            )
 
     with path.open("rb") as fh:
         obj = pickle.load(fh)
@@ -52,25 +64,36 @@ def _load(filename: str) -> Any:
 
 
 # ── Artefacts ─────────────────────────────────────────────────────────────────
-scaler: Any = _load("scaler.pkl")
+try:
+    scaler: Any = _load("scaler.pkl")
 
-lr_models:  list[Any] = _load("logistic_regression_fold_models.pkl")
-rf_models:  list[Any] = _load("random_forest_fold_models.pkl")
-xgb_models: list[Any] = _load("xgboost_fold_models.pkl")
-meta_learner: Any     = _load("meta_learner.pkl")
+    lr_models:  list[Any] = _load("logistic_regression_fold_models.pkl")
+    rf_models:  list[Any] = _load("random_forest_fold_models.pkl")
+    xgb_models: list[Any] = _load("xgboost_fold_models.pkl")
+    meta_learner: Any     = _load("meta_learner.pkl")
 
-# ── Metadata ──────────────────────────────────────────────────────────────────
-with (_MODELS_DIR / "feature_names.json").open() as fh:
-    FEATURE_NAMES: list[str] = json.load(fh)
+    # ── Metadata ──────────────────────────────────────────────────────────────
+    with (_MODELS_DIR / "feature_names.json").open() as fh:
+        FEATURE_NAMES: list[str] = json.load(fh)
 
-with (_MODELS_DIR / "metrics.json").open() as fh:
-    _metrics = json.load(fh)
+    with (_MODELS_DIR / "metrics.json").open() as fh:
+        _metrics = json.load(fh)
 
-# Use the threshold tuned during training; fall back to 0.68 if key is absent.
-FRAUD_THRESHOLD: float = float(_metrics.get("optimal_threshold", 0.68))
+    # Use the threshold tuned during training; fall back to 0.68 if key is absent.
+    FRAUD_THRESHOLD: float = float(_metrics.get("optimal_threshold", 0.68))
 
-logger.info(
-    "Model registry ready — %d features, fraud threshold=%.4f",
-    len(FEATURE_NAMES),
-    FRAUD_THRESHOLD,
-)
+    logger.info(
+        "Model registry ready — %d features, fraud threshold=%.4f",
+        len(FEATURE_NAMES),
+        FRAUD_THRESHOLD,
+    )
+
+except (FileNotFoundError, RuntimeError) as exc:
+    # Log clearly and re-raise so the startup hook surfaces the error
+    # with a descriptive message rather than a cryptic UnpicklingError.
+    logger.critical(
+        "FATAL: Model registry failed to load — %s\n"
+        "The API cannot serve predictions until this is resolved.",
+        exc,
+    )
+    raise

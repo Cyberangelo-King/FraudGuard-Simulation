@@ -3,7 +3,7 @@ services:
     name: fraudguard-backend
     env: python
     plan: free
-    buildCommand: "git lfs install && git lfs pull && pip install -r backend/requirements.txt"
+    buildCommand: "pip install -r backend/requirements.txt"
     startCommand: "uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: SUPABASE_URL
@@ -11,6 +11,8 @@ services:
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: GEMINI_API_KEY
+        sync: false
+      - key: CORS_ORIGINS
         sync: false
       - key: PYTHON_VERSION
         value: 3.11.0

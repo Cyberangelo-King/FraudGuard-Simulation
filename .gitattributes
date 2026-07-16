@@ -1,2 +1,11 @@
-models/*.pkl filter=lfs diff=lfs merge=lfs -text
-*.pkl filter=lfs diff=lfs merge=lfs -text
+# Git LFS tracking
+# NOTE: *.pkl LFS tracking has been REMOVED because:
+# 1. Render (free tier) does not pull Git LFS objects during build/deploy.
+# 2. The model *.pkl files are small enough to store directly in git.
+# 3. LFS pointer files cause UnpicklingError at runtime on Render.
+#
+# IMPORTANT: You must also re-commit the actual binary files locally:
+#   git lfs untrack '*.pkl'
+#   git rm --cached models/*.pkl
+#   git add models/*.pkl
+#   git commit -m 'Remove LFS tracking from model files'
