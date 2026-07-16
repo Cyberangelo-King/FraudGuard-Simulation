@@ -35,6 +35,16 @@ def _load(filename: str) -> Any:
     path = _MODELS_DIR / filename
     if not path.exists():
         raise FileNotFoundError(f"Model artefact not found: {path}")
+    
+    # NEW: Check if the file is a dummy LFS pointer before trying to unpickle
+    file_size_bytes = path.stat().st_size
+    if file_size_bytes < 500: # LFS pointers are usually < 150 bytes
+        raise RuntimeError(
+            f"ERROR: {filename} is only {file_size_bytes} bytes. "
+            "It is an LFS pointer, not a binary file! "
+            "Render failed to pull LFS data."
+        )
+
     with path.open("rb") as fh:
         obj = pickle.load(fh)
     logger.info("Loaded %s  (%s)", filename, type(obj).__name__)
