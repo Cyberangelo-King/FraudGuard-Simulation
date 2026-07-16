@@ -3,8 +3,8 @@ services:
     name: fraudguard-backend
     env: python
     plan: free
-    buildCommand: "pip install -r backend/requirements.txt"
-    startCommand: "cd backend && uvicorn app:app --host 0.0.0.0 --port $PORT"
+    buildCommand: "git lfs install && git lfs pull && pip install -r backend/requirements.txt"
+    startCommand: "uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: SUPABASE_URL
         sync: false
