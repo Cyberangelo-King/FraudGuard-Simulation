@@ -9,11 +9,11 @@ File layout expected (relative to this file's package root):
     ../../models/
         scaler.pkl
         logistic_regression_fold_models.pkl   → list[LogisticRegression]
-        random_forest_fold_models.pkl         → list[RandomForestClassifier]
-        xgboost_fold_models.pkl               → list[XGBClassifier]
-        meta_learner.pkl                      → LogisticRegression (stacking)
-        feature_names.json                    → list[str]  (30 features)
-        metrics.json                          → {"optimal_threshold": float, ...}
+        random_forest_fold_models.pkl          → list[RandomForestClassifier]  (optional — large file)
+        xgboost_fold_models.pkl                → list[XGBClassifier]
+        meta_learner.pkl                       → LogisticRegression (stacking)
+        feature_names.json                     → list[str]  (30 features)
+        metrics.json                           → {"optimal_threshold": float, ...}
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# ── Resolve the models directory ─────────────────────────────────────────────
+# ── Resolve the models directory ──────────────────────────────────────────────
 # backend/app/model_registry.py  →  ../../models/
 _MODELS_DIR = Path(__file__).resolve().parent.parent.parent / "models"
 
@@ -63,12 +63,31 @@ def _load(filename: str) -> Any:
     return obj
 
 
+def _load_optional(filename: str) -> Any | None:
+    """Load a model file, returning None if it's missing or an LFS pointer."""
+    try:
+        return _load(filename)
+    except (FileNotFoundError, RuntimeError) as e:
+        logger.warning(
+            "Optional model %s could not be loaded — skipping. "
+            "Ensemble will run without it. Reason: %s",
+            filename,
+            e,
+        )
+        return None
+
+
 # ── Artefacts ─────────────────────────────────────────────────────────────────
 try:
     scaler: Any = _load("scaler.pkl")
 
     lr_models:  list[Any] = _load("logistic_regression_fold_models.pkl")
-    rf_models:  list[Any] = _load("random_forest_fold_models.pkl")
+
+    # Random forest is large (203MB) and may be stored in Git LFS.
+    # It is loaded as optional so the API can still serve predictions
+    # using the remaining ensemble members if this file is unavailable.
+    rf_models: list[Any] | None = _load_optional("random_forest_fold_models.pkl")
+
     xgb_models: list[Any] = _load("xgboost_fold_models.pkl")
     meta_learner: Any     = _load("meta_learner.pkl")
 
@@ -81,6 +100,14 @@ try:
 
     # Use the threshold tuned during training; fall back to 0.68 if key is absent.
     FRAUD_THRESHOLD: float = float(_metrics.get("optimal_threshold", 0.68))
+
+    if rf_models is None:
+        logger.warning(
+            "Random forest model unavailable — ensemble uses LR + XGB + meta-learner only. "
+            "To include random forest, commit random_forest_fold_models.pkl as a real binary "
+            "(not Git LFS). File is 203MB so consider Git LFS alternatives like storing "
+            "on Hugging Face Hub or S3 and downloading at startup."
+        )
 
     logger.info(
         "Model registry ready — %d features, fraud threshold=%.4f",
