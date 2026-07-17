@@ -5,11 +5,12 @@ pydantic>=2.7.0
 python-dotenv>=1.0.1
 httpx>=0.27.0
 
-# ── ML / Inference ────────────────────────────────────────────────
+# ML / Inference
 scikit-learn>=1.5.0
 xgboost>=2.0.3
 shap>=0.45.0
 numpy>=1.26.0
+pandas>=2.0.0
 
-# ── Google Generative AI ─────────────────────────────────────────
+# Google Generative AI
 google-generativeai>=0.7.0

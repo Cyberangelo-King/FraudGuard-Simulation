@@ -1,6 +1,6 @@
 """
 FraudGuard — Prediction Service
-=================================
+================================
 Encapsulates the full inference pipeline:
 
     raw features
@@ -9,22 +9,22 @@ Encapsulates the full inference pipeline:
     StandardScaler   (fitted on training data)
         │
         ▼
-    ┌───────────────────────────────┐
+    ┌──────────────────────────────────────┐
     │  LR fold models  (avg proba)  │
     │  RF fold models  (avg proba)  │  ──► stacked meta-features
     │  XGB fold models (avg proba)  │
-    └───────────────────────────────┘
+    └──────────────────────────────────────┘
         │
         ▼
-    Meta-learner   →  ensemble_score  (fraud probability, 0-1)
+    Meta-learner  →  ensemble_score  (fraud probability, 0-1)
         │
         ▼
     [if score > FRAUD_THRESHOLD]
         │
-        ├── SHAP TreeExplainer on XGB ensemble (ThreadPoolExecutor)
-        │       → top-5 contributing features
-        │
-        └── Gemini API  →  2-sentence alert text
+        └── SHAP TreeExplainer on XGB ensemble (ThreadPoolExecutor)
+                │       → top-5 contributing features
+                │
+                └── Gemini API  →  2-sentence alert text
 
 All CPU-bound work (SHAP) is off-loaded to a ThreadPoolExecutor so the
 async FastAPI event loop is never blocked.
@@ -86,10 +86,24 @@ def _compute_shap_sync(X_scaled: np.ndarray) -> list[tuple[str, float]]:
     Synchronous SHAP computation — runs inside the thread pool.
 
     Uses the first XGB fold model as the representative explainer.
+
+    SHAP API note: TreeExplainer.shap_values() returns:
+      - A list of two arrays [class_0_shap, class_1_shap] in older SHAP versions
+      - A single ndarray of shape (n_samples, n_features) in newer SHAP versions
+    We explicitly handle both cases and always use class-1 (fraud) SHAP values.
+
     Returns [(feature_name, shap_value), ...] sorted by |shap_value| desc.
     """
     explainer = shap.TreeExplainer(xgb_models[0])
-    shap_values = explainer.shap_values(X_scaled)  # (n_samples, n_features)
+    raw = explainer.shap_values(X_scaled)  # (n_samples, n_features) or list of two
+
+    # FIX: correctly extract fraud-class (class 1) SHAP values regardless of SHAP version
+    if isinstance(raw, list):
+        # Old SHAP API: raw is [class_0_array, class_1_array]
+        shap_values = raw[1]   # use class-1 (fraud) array
+    else:
+        # New SHAP API: raw is already (n_samples, n_features) for the positive class
+        shap_values = raw
 
     row = shap_values[0]  # single-row prediction
     ranked = sorted(
@@ -184,7 +198,7 @@ async def run_inference(
     xgb_p = _avg_proba(xgb_models, X_scaled)
 
     # 4. Stack into meta-features and get final score
-    meta_X        = np.column_stack([lr_p, rf_p, xgb_p])  # (1, 3)
+    meta_X         = np.column_stack([lr_p, rf_p, xgb_p])  # (1, 3)
     ensemble_score = float(meta_learner.predict_proba(meta_X)[0, 1])
 
     status              = "pending"
