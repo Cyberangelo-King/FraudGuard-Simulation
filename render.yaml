@@ -3,7 +3,7 @@ services:
     name: fraudguard-backend
     env: python
     plan: free
-    buildCommand: "pip install -r backend/requirements.txt"
+    buildCommand: "git lfs install && git lfs pull && pip install -r backend/requirements.txt"
     startCommand: "uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: SUPABASE_URL
@@ -12,7 +12,7 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
-      - key: CORS_ORIGINS
-        sync: false
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: CORS_ORIGINS
+        value: "https://fraud-guard-simulation.vercel.app,https://fraud-guard-simulation-git-main-cyberangelo-kings-projects.vercel.app"
