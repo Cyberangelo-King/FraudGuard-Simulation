@@ -1,15 +1,18 @@
-c2VydmljZXM6CiAgLSB0eXBlOiB3ZWIKICAgIG5hbWU6IGZyYXVkZ3VhcmQt
-YmFja2VuZAogICAgZW52OiBweXRob24KICAgIHBsYW46IGZyZWUKICAgIGJ1
-aWxkQ29tbWFuZDogImFwdC1nZXQgaW5zdGFsbCAteSBnaXQtbGZzICYmIGdp
-dCBsZnMgaW5zdGFsbCAmJiBnaXQgbGZzIHB1bGwgJiYgcGlwIGluc3RhbGwg
-LXIgYmFja2VuZC9yZXF1aXJlbWVudHMudHh0IgogICAgc3RhcnRDb21tYW5k
-OiAidXZpY29ybiBiYWNrZW5kLmFwcC5tYWluOmFwcCAtLWhvc3QgMC4wLjAu
-MCAtLXBvcnQgJFBPUlQiCiAgICBlbnZWYXJzOgogICAgICAtIGtleTogU1VQ
-QUJBU0VfVVJMCiAgICAgICAgc3luYzogZmFsc2UKICAgICAgLSBrZXk6IFNV
-UEFCQVNFX1NFUlZJQ0VfUk9MRV9LRVkKICAgICAgICBzeW5jOiBmYWxzZQog
-ICAgICAtIGtleTogR0VNSU5JX0FQSV9LRVkKICAgICAgICBzeW5jOiBmYWxz
-ZQogICAgICAtIGtleTogUFlUSE9OX1ZFUlNJT04KICAgICAgICB2YWx1ZTog
-My4xMS4wCiAgICAgIC0ga2V5OiBDT1JTX09SSUdJTlMKICAgICAgICB2YWx1
-ZTogImh0dHBzOi8vZnJhdWQtZ3VhcmQtc2ltdWxhdGlvbi52ZXJjZWwuYXBw
-LGh0dHBzOi8vZnJhdWQtZ3VhcmQtc2ltdWxhdGlvbi1naXQtbWFpbi1jeWJl
-cmFuZ2Vsby1raW5ncy1wcm9qZWN0cy52ZXJjZWwuYXBwIgo=
+services:
+  - type: web
+    name: fraudguard-backend
+    env: python
+    plan: free
+    buildCommand: "pip install -r backend/requirements.txt"
+    startCommand: "uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: CORS_ORIGINS
+        value: "https://fraud-guard-simulation.vercel.app,https://fraud-guard-simulation-git-main-cyberangelo-kings-projects.vercel.app"
