@@ -194,8 +194,14 @@ async def run_inference(
 
     # 3. Base-model probabilities
     lr_p  = _avg_proba(lr_models,  X_scaled)
-    rf_p  = _avg_proba(rf_models,  X_scaled)
     xgb_p = _avg_proba(xgb_models, X_scaled)
+
+    if rf_models is not None:
+        rf_p = _avg_proba(rf_models, X_scaled)
+    else:
+        # RF model unavailable (Git LFS file not pulled) — impute with mean of LR and XGB
+        logger.warning("RF model unavailable — imputing rf_p as mean(lr_p, xgb_p)")
+        rf_p = (lr_p + xgb_p) / 2.0
 
     # 4. Stack into meta-features and get final score
     meta_X         = np.column_stack([lr_p, rf_p, xgb_p])  # (1, 3)
